@@ -1,6 +1,6 @@
 // Import Firebase modules
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js';
-import { getDatabase, ref, push, set, onValue } from 'https://www.gstatic.com/firebasejs/9.15.0/firebase-database.js';
+import { getDatabase, ref, push, set, onValue, remove } from 'https://www.gstatic.com/firebasejs/9.15.0/firebase-database.js';
 
 // Firebase configuration
 const firebaseConfig = {
@@ -16,77 +16,77 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
-
-// Initialize Realtime Database
 const database = getDatabase(app);
 
 // Initialize the map
 const map = L.map('map').setView([20.5937, 78.9629], 5); // Centered on India
-
-// Add OpenStreetMap tiles
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
     attribution: '© OpenStreetMap contributors',
 }).addTo(map);
 
-// Array to store reported issues (to render on page)
-const reportedIssues = [];
+// Array to store reported issues
+let reportedIssues = [];
+let markers = {}; // Store markers for deletion
 
 // Add a click listener to place a marker
 map.on('click', (e) => {
     const { lat, lng } = e.latlng;
-
-    // Check if this location is already reported
-    const existingIssue = reportedIssues.find(issue => 
-        Math.abs(issue.lat - lat) < 0.001 && Math.abs(issue.lng - lng) < 0.001
-    );
-
-    if (existingIssue) {
-        existingIssue.count++; // Increase count
-        alert(`This location has been reported ${existingIssue.count} times.`);
-    } else {
-        // Prompt user for issue description
-        const description = prompt('Describe the road issue:');
-        if (description) {
-            reportedIssues.push({ lat, lng, description, count: 1 });
-            L.marker([lat, lng])
-                .addTo(map)
-                .bindPopup(`Issue: ${description} (Reported 1 time)`)
-                .openPopup();
-
-            // Save report to Firebase
-            addReport(lat, lng, description);
-        }
+    const description = prompt('Describe the road issue:');
+    if (description) {
+        addReport(lat, lng, description);
     }
-
-    console.log('Current Issues:', reportedIssues);
-    renderReports();
 });
-
-// Function to render reports on the page
-function renderReports() {
-    const reportsDiv = document.getElementById('reports');
-    reportsDiv.innerHTML = '<h2>Reported Issues</h2>';
-    reportedIssues.forEach((issue, index) => {
-        reportsDiv.innerHTML += `
-            <p>${index + 1}. ${issue.description} - Latitude: ${issue.lat.toFixed(4)}, Longitude: ${issue.lng.toFixed(4)} 
-            (Reported ${issue.count} times)</p>`;
-    });
-}
 
 // Function to add a report to Firebase
 function addReport(lat, lng, description) {
     const reportRef = ref(database, 'reports');
-    const newReportRef = push(reportRef); // Generate a unique key for each report
-    const reportData = { lat, lng, description, count: 1 };
+    const newReportRef = push(reportRef);
+    const reportData = { lat, lng, description };
 
     set(newReportRef, reportData)
+        .then(() => console.log('Report saved successfully'))
+        .catch((error) => console.error('Error saving report:', error));
+}
+
+// Function to delete a report from Firebase
+function deleteReport(reportId) {
+    const reportRef = ref(database, `reports/${reportId}`);
+    remove(reportRef)
         .then(() => {
-            console.log('Report saved successfully');
+            console.log('Report deleted successfully');
+            if (markers[reportId]) {
+                map.removeLayer(markers[reportId]); // Remove marker from map
+                delete markers[reportId];
+            }
         })
-        .catch((error) => {
-            console.error('Error saving report:', error);
+        .catch((error) => console.error('Error deleting report:', error));
+}
+
+// Function to render reports on the page
+function renderReports() {
+    const reportList = document.getElementById('report-list');
+    reportList.innerHTML = '';
+
+    reportedIssues.forEach((issue) => {
+        const listItem = document.createElement('div');
+        listItem.classList.add('report-item');
+
+        listItem.innerHTML = `
+            <p>${issue.description} - Lat: ${issue.lat.toFixed(4)}, Lng: ${issue.lng.toFixed(4)}</p>
+            <button class="delete-btn" data-id="${issue.id}">Delete</button>
+        `;
+
+        reportList.appendChild(listItem);
+    });
+
+    // Add delete functionality
+    document.querySelectorAll('.delete-btn').forEach((button) => {
+        button.addEventListener('click', () => {
+            const reportId = button.getAttribute('data-id');
+            deleteReport(reportId);
         });
+    });
 }
 
 // Function to load reports from Firebase and display them
@@ -94,17 +94,24 @@ function getReports() {
     const reportsRef = ref(database, 'reports');
     onValue(reportsRef, (snapshot) => {
         const reports = snapshot.val();
+        reportedIssues = [];
+
         if (reports) {
             for (const id in reports) {
-                const { lat, lng, description } = reports[id];
-                console.log(`Lat: ${lat}, Lng: ${lng}, Desc: ${description}`);
-                // Add marker to the map
-                L.marker([lat, lng]).addTo(map).bindPopup(description);
-                // Add report to local array to render on page
-                reportedIssues.push({ lat, lng, description, count: 1 });
+                const report = { id, ...reports[id] };
+                reportedIssues.push(report);
+
+                // Add marker to the map if not already added
+                if (!markers[id]) {
+                    const marker = L.marker([report.lat, report.lng])
+                        .addTo(map)
+                        .bindPopup(report.description);
+                    markers[id] = marker;
+                }
             }
         }
-        renderReports();  // Call to render reports after data is loaded
+
+        renderReports();
     });
 }
 

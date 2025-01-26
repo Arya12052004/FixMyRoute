@@ -3,23 +3,37 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Road Condition Reporter</title>
+    <title>FixMyRoute</title>
     <link rel="stylesheet" href="style.css">
     
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+</head>
+<body>
+    <header>
+        <h1>FixMyRoute</h1>
+    </header>
+
+    <main>
+        <!-- Map Container -->
+        <div id="map"></div>
+
+        <!-- Report Section -->
+        <div id="reports">
+            <h2>Reported Issues</h2>
+            <div id="report-list">
+                <!-- List of issues will dynamically populate here -->
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <p>&copy; 2025 FixMyRoute</p>
+    </footer>
 
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-</head>
-<body>
-    <h1>Road Condition Reporter</h1>
-    <div id="map"></div> <!-- Map container -->
-    <div id="reports" style="padding: 10px;">
-        <h2>Reported Issues</h2>
-    </div>
-    
-    <!-- Your custom script, with type="module" -->
+    <!-- Custom JS -->
     <script type="module" src="script.js"></script>
 </body>
 </html>
